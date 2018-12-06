@@ -141,6 +141,7 @@ check_treasure_loop:
         # syscall
         # move       $a0, $s7
         sw         $s3, PICK_TREASURE($0)                   # pick up treasure
+        j          end_check_treasure_loop
 increment:
         add        $s2, $s2, 1                              # i++
         j          check_treasure_loop
@@ -158,11 +159,242 @@ end_check_treasure_loop:
         add        $sp, $sp, 36                             # delocate memory
         jr         $ra                                      # return
 
+###########################################################################
+#                       The rule 1 they give us                           #
+###########################################################################
+## bool
+## rule1(unsigned short board[GRID_SQUARED][GRID_SQUARED]) {
+##   bool changed = false;
+##   for (int i = 0 ; i < GRID_SQUARED ; ++ i) {
+##     for (int j = 0 ; j < GRID_SQUARED ; ++ j) {
+##       unsigned value = board[i][j];
+##       if (has_single_bit_set(value)) {
+##         for (int k = 0 ; k < GRID_SQUARED ; ++ k) {
+##           // eliminate from row
+##           if (k != j) {
+##             if (board[i][k] & value) {
+##               board[i][k] &= ~value;
+##               changed = true;
+##             }
+##           }
+##           // eliminate from column
+##           if (k != i) {
+##             if (board[k][j] & value) {
+##               board[k][j] &= ~value;
+##               changed = true;
+##             }
+##           }
+##         }
+##
+##         // elimnate from square
+##         int ii = get_square_begin(i);
+##         int jj = get_square_begin(j);
+##         for (int k = ii ; k < ii + GRIDSIZE ; ++ k) {
+##           for (int l = jj ; l < jj + GRIDSIZE ; ++ l) {
+##             if ((k == i) && (l == j)) {
+##               continue;
+##             }
+##             if (board[k][l] & value) {
+##               board[k][l] &= ~value;
+##               changed = true;
+##             }
+##           }
+##         }
+##       }
+##     }
+##   }
+##   return changed;
+## }
+
+.globl rule1
+rule1:
+	li 		$v0, 0   					# bool changed = false;
+	li 		$s0, 0						# int i = 0;
+	sub 	$sp, $sp, 12				# allocate memory for $ra, $a0, $v0
+	sw 		$ra, 0($sp)					# store $ra
+	sw 		$a0, 4($sp)					# store $a0
+
+outter_loop:
+	bge 	$s0, 16, end				# i >= GRID_SQUARED;
+	li 		$s1, 0						# j = 0;
+
+first_inner_loop:
+	bge 	$s1, 16, end_1st_inner_loop # j >= GRID_SQUARED;
+	mul 	$t0, $s0, 16				# i * GRID_SQUARED
+	add 	$t0, $t0, $s1				# i * GRID_SQUARED + j
+	mul		$t0, $t0, 2					# (i * GRID_SQUARED + j) * 2
+	add 	$t0, $a0, $t0				# &board[i][j];
+	lhu 	$s7, 0($t0)					# value = board[i][j]
+	sw 		$v0, 8($sp)					# store $v0
+	move 	$a0, $s7					# $a0 = value
+	jal 	has_single_bit_set			# has_single_bit_set(value)
+	lw		$a0, 4($sp)					# restore $a0
+	beq 	$v0, 1, elimination 		# has_single_bit_set(value) == true
+	lw 		$v0, 8($sp)					# restore $v0
+	add 	$s1, $s1, 1					# j++
+	j		first_inner_loop 			# do first_inner_loop iteration
+
+elimination:
+	lw 		$v0, 8($sp)					# restore $v0
+	li 		$s2, 0						# k = 0
+
+second_inner_loop:
+	bge 	$s2, 16, end_2nd_inner_loop # k >= GRID_SQUARED;
+	bne 	$s2, $s1, eliminate_row 	# if (k != j) eliminate_row
+keep_going:
+	bne 	$s2, $s0, eliminate_column  # if (k != i) eliminate_column
+	add  	$s2, $s2, 1					# k++;
+	j 		second_inner_loop
+
+end_1st_inner_loop:
+	add 	$s0, $s0, 1 				# i++;
+	j 		outter_loop					# do outter_loop iteration again
+
+end_2nd_inner_loop:
+	move 	$a0, $s0 					# (i)
+	sw 		$v0, 8($sp)					# store $v0;
+	jal 	get_square_begin			# get_square_begin(i)
+	move 	$s2, $v0					# $s2 = k = ii = get_square_begin(i);
+	move 	$a0, $s1 					# (j)
+	jal 	get_square_begin			# get_square_begin(j)
+	move 	$s3, $v0					# $s3 = jj = get_square_begin(j);
+	lw 		$a0, 4($sp)					# restore $a0
+	lw 		$v0, 8($sp)					# restore $v0
+	add 	$s4, $s2, 4					# $s4 = ii + GRIDSIZE
+	add 	$s5, $s3, 4					# $s5 = jj + GRIDSIZE
+
+last_nest_loop_out:
+	bge 	$s2, $s4, finish_end_loop 	# k >= ii + GRIDSIZE
+	move 	$s6, $s3					# l = jj
+
+last_nest_loop_in:
+	bge 	$s6, $s5, finish_end_inloop	# l >= jj + GRIDSIZE
+	sub 	$t0, $s2, $s0 				# s2 - s0 == k - i
+	sub 	$t1, $s6, $s1 				# s6 - s1 == l - j
+	or 		$t1, $t0, $t1				# or(k - i && l - j)
+	beq		$t1, $0, skip				# if ((k == i) && (l == j))
+	mul 	$t0, $s2, 16				# k * GRID_SQUARED
+	add 	$t0, $t0, $s6				# k * GRID_SQUARED + l
+	mul		$t0, $t0, 2					# (k * GRID_SQUARED + l) * 2
+	add 	$t0, $a0, $t0				# &board[k][l];
+	lhu 	$t1, 0($t0)					# $t1 = board[k][l];
+	and     $t2, $s7, $t1				# $t2 = $t1 & value
+	beq 	$t2, $0, skip  				# board[k][l] & value = 0
+	nor 	$t2, $s7, $0				# $t2 = ~value
+	and 	$t1, $t1, $t2				# $t1 = board[k][l] & ~value
+	sh 		$t1, 0($t0)					# board[k][l] &= ~value
+	li 		$v0, 1						# chanegd = true;
+skip:
+	add 	$s6, $s6, 1					# l++
+	j 		last_nest_loop_in
+
+finish_end_inloop:
+	add 	$s2, $s2, 1					# k++
+	j 		last_nest_loop_out
+
+finish_end_loop:
+	add 	$s1, $s1, 1					# j++
+	j 		first_inner_loop
+
+eliminate_row:
+	mul 	$t0, $s0, 16				# i * GRID_SQUARED
+	add 	$t0, $t0, $s2				# i * GRID_SQUARED + k
+	mul		$t0, $t0, 2					# (i * GRID_SQUARED + k) * 2
+	add 	$t0, $a0, $t0				# &board[i][k];
+	lhu 	$t1, 0($t0)					# $t1 = board[i][k];
+	and     $t2, $s7, $t1				# $t2 = $t1 & value
+	beq 	$t2, $0, keep_going  		# board[i][k] & value = 0
+	nor 	$t2, $s7, $0				# $t2 = ~value
+	and 	$t1, $t1, $t2				# $t1 = board[i][k] & ~value
+	sh 		$t1, 0($t0)					# board[i][k] &= ~value
+	li 		$v0, 1						# chanegd = true;
+	j 		keep_going					# go to next if;
+
+eliminate_column:
+	mul 	$t0, $s2, 16				# k * GRID_SQUARED
+	add 	$t0, $t0, $s1				# k * GRID_SQUARED + j
+	mul		$t0, $t0, 2					# (k * GRID_SQUARED + j) * 2
+	add 	$t0, $a0, $t0				# &board[k][j];
+	lhu 	$t1, 0($t0)					# $t1 = board[k][j];
+	and     $t2, $s7, $t1				# $t2 = $t1 & value
+	beq 	$t2, $0, finish_k_iter   	# board[k][j] & value = 0
+	nor 	$t2, $s7, $0				# $t2 = ~value
+	and 	$t1, $t1, $t2				# $t1 = board[k][j] & ~value
+	sh 		$t1, 0($t0)					# board[k][j] &= ~value
+	li 		$v0, 1						# chanegd = true;
+finish_k_iter:
+	add 	$s2, $s2, 1					# k++
+	j 		second_inner_loop			# go to eliminate_square;
 
 
+end:
+	lw 		$ra, 0($sp)					# restore $ra
+	add 	$sp, $sp, 12				# restore stack
+    jr      $ra                         # return changed
+###########################################################################
+#                       rule 2                                            #
+###########################################################################
+# bool
+# rule2(unsigned short board[GRID_SQUARED][GRID_SQUARED]) {
+#   bool changed = false;
+#   for (int i = 0 ; i < GRID_SQUARED ; ++ i) {
+#     for (int j = 0 ; j < GRID_SQUARED ; ++ j) {
+#       unsigned value = board[i][j];
+#       if (has_single_bit_set(value)) {
+#         continue;
+#       }
+#
+#       int jsum = 0, isum = 0;
+#       for (int k = 0 ; k < GRID_SQUARED ; ++ k) {
+#         if (k != j) {
+#           jsum |= board[i][k];        // summarize row
+#         }
+#         if (k != i) {
+#           isum |= board[k][j];         // summarize column
+#         }
+#       }
+#       if (ALL_VALUES != jsum) {
+#         board[i][j] = ALL_VALUES & ~jsum;
+#         changed = true;
+#         continue;
+#       } else if (ALL_VALUES != isum) {
+#         board[i][j] = ALL_VALUES & ~isum;
+#         changed = true;
+#         continue;
+#       }
+#
+#       // eliminate from square
+#       int ii = get_square_begin(i);
+#       int jj = get_square_begin(j);
+#       unsigned sum = 0;
+#       for (int k = ii ; k < ii + GRIDSIZE ; ++ k) {
+#         for (int l = jj ; l < jj + GRIDSIZE ; ++ l) {
+#           if ((k == i) && (l == j)) {
+#             continue;
+#           }
+#           sum |= board[k][l];
+#         }
+#       }
+#
+#       if (ALL_VALUES != sum) {
+#         board[i][j] = ALL_VALUES & ~sum;
+#         changed = true;
+#       }
+#     }
+#   }
+#   return changed;
+# }
+
+rule2:
+
+###########################################################################
+#                       my own solve                                      #
+###########################################################################
 # this function is used to solve the puzzle in a quick manner. I combine the
 # rule 1 and rule 2 to make it run pretty fast.
 puzzle_solver:
+
+
 
 ###########################################################################
 #                       main function begin                               #
@@ -175,16 +407,18 @@ main:
         mtc0       $t6, $12                                 # set up the status register
         li         $t0, 10                                  # t0 = velocity of the spimBot
         sw         $t0, VELOCITY($0)                        # set the velocity of the spimBot
-        li         $t0, 1                                   # set initial has right wall
+        li         $t2, 1                                   # set initial has right wall
         li         $t7, 0                                   # timer interrupt checker = 0;
         lw         $t6, TIMER($0)                           # get current time
-        add        $t6, $t6, 100                            # request 10000cycle interrupt
+        add        $t6, $t6, 10000                          # request 10000 cycle interrupt
         sw         $t6, TIMER($0)                           # request interrupt
 
 explore_loop:
         lw         $t1, RIGHT_WALL_SENSOR($0)               # t1 = right_wall_sensor
 
         bne        $t7, 1, continue                         # we still in the same block
+        li         $t0, 0                                   # t0 = velocity of the spimBot
+        sw         $t0, VELOCITY($0)                        # set the velocity of the spimBot
         li         $t7, 0
         sub        $sp, $sp, 4                              # allocate memory
         sw         $ra, 0($sp)                              # store ra
@@ -195,10 +429,12 @@ explore_loop:
         div        $t4, $t4, 10                             # t4 /= t4
         mflo       $a0                                      # t4 = row number
         jal        find_has_treasure
+        li         $t0, 10                                  # t0 = velocity of the spimBot
+        sw         $t0, VELOCITY($0)                        # set the velocity of the spimBot
         lw         $ra, 0($sp)                              # restore ra
         add        $sp, $sp, 4                              # dellocate memory
         lw         $t6, TIMER($0)                           # get current time
-        add        $t6, $t6, 10010                          # request 10000 cycle interrupt
+        add        $t6, $t6, 10000                          # request 10000 cycle interrupt
         sw         $t6, TIMER($0)                           # request interrupt
 continue:
         not        $t3, $t1                                 # ~right_wall_sensor
