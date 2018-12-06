@@ -3,6 +3,8 @@
 PRINT_STRING            = 4
 PRINT_CHAR              = 11
 PRINT_INT               = 1
+NEW_LINE:               .asciiz "\n"
+SPACE_LINE:             .asciiz "-"
 
 # memory-mapped I/O
 VELOCITY                = 0xffff0010
@@ -45,11 +47,29 @@ REQUEST_PUZZLE_ACK      = 0xffff00d8
 #    struct spim_treasure treasures[50];
 #};
 .data
+####################### all the data segment code goes here ###############
 .align 4
 finish_request_puzzle:  .word 0
 treasure_map: .word 404
-#Insert whatever static memory you need here
+###########################################################################
 
+###########################################################################
+#                     self-defined functions goes here                    #
+###########################################################################
+
+# this function in C code: bool find_has_treasure(int x, int y);
+# take in two parameters x and y, which are spimbot current location and return
+# whether current location has treasure. 1 if has 0 if there is no treasure.
+find_has_treasure:
+
+# this function is used to solve the puzzle in a quick manner. I combine the
+# rule 1 and rule 2 to make it run pretty fast.
+puzzle_solver:
+
+
+###########################################################################
+#                       main function begin                               #
+###########################################################################
 .text
 main:
     	# Insert code here
@@ -61,16 +81,6 @@ main:
         li         $t0, 10                                  # t0 = velocity of the spimBot
         sw         $t0, VELOCITY($0)                        # set the velocity of the spimBot
         li         $t0, 1                                   # set initial has right wall
-        la         $t6, treasure_map                        # load the address of the treasure_map
-        sw         $t6, TREASURE_MAP($0)                    # get the treasure_map value
-        lw         $t1, 0($t6)                              # $t1 = Length in treasure_map
-        #li         $v0, PRINT_INT
-        #li         $a0, 15
-        #syscall
-        li      $v0, PRINT_STRING
-        la      $a0, non_intrpt_str
-        syscall            
-
 
 explore_loop:
         lw         $t1, RIGHT_WALL_SENSOR($0)               # t1 = right_wall_sensor
@@ -87,10 +97,13 @@ skip:
         move       $t2, $t1                                 # store current hasWall
         j          explore_loop
 
-        jr         $ra                                      # ret
+        jr         $ra                                      # ret (useless)
 
 
-# Kernel Text
+
+###########################################################################
+#                   kerner begin    try not put code here                 #
+###########################################################################
 .kdata
 chunkIH:    .space 28
 non_intrpt_str:    .asciiz "Non-interrupt exception\n"
