@@ -56,7 +56,7 @@ treasure_map:           .word 404
 
 .text
 ###########################################################################
-#                     self-defined functions goes here                    #
+#                     self-defined functions 		                      #
 ###########################################################################
 
 # this function in C code: bool find_has_treasure(int x, int y);
@@ -395,32 +395,35 @@ rule2:
 	sw	$s5, 20($sp)
 	sw	$s6, 24($sp)
 	sw	$s7, 28($sp)
-	li	$s0, 0			# Changed == False
-	li	$s1, 0			# iter i
+	li	$s0, 0									# Changed == False
+	li	$s1, 0									# iter i
 outter_loop2:
-	beq	$s1, 16, return		# i >= 16, return
-	li	$s2, 0			# j = 0
+	beq	$s1, 16, return							# i >= 16, return
+	li	$s2, 0									# j = 0
 inner_loop:
-	beq	$s2, 16, increment_i	# j == 16
+	beq	$s2, 16, increment_i					# j == 16
+
 #       unsigned value = board[i][j];
 #       if (has_single_bit_set(value)) {
 #         continue;
 #       }
-	mul	$s6, $s1, 16		# the starting index of row i
-	sll	$s6, $s6, 1 		# the starting location of row i
-	sll	$s7, $s2, 1		# offset of col j
-	add	$s7, $s7, $s6		# the location of board[i][j], we may want to reuse $s7
+
+	mul	$s6, $s1, 16							# the starting index of row i
+	sll	$s6, $s6, 1 							# the starting location of row i
+	sll	$s7, $s2, 1								# offset of col j
+	add	$s7, $s7, $s6							# the location of board[i][j], we may want to reuse $s7
 	add	$s7, $s7, $a0
-	lhu	$s3, 0($s7)		# value = board[i][j]
+	lhu	$s3, 0($s7)								# value = board[i][j]
 	
 #start check if	
-	sw	$a0, 32($sp)		# save a0
-	sw	$ra, 36($sp)		# save ra
+	sw	$a0, 32($sp)							# save a0
+	sw	$ra, 36($sp)							# save ra
 	move	$a0, $s3	
-	jal	has_single_bit_set	# call has a single bit
+	jal	has_single_bit_set						# call has a single bit
 	lw	$a0, 32($sp)
-	lw	$ra, 36($sp)
-	beq	$v0, 1, increment_j	# take if <=> has single bit value == 1
+	lw	$ra, 36($sp)	
+	beq	$v0, 1, increment_j						# take if <=> has single bit value == 1
+
 #finish check if
 #	int jsum = 0, isum = 0;
 #       for (int k = 0 ; k < GRID_SQUARED ; ++ k) {
@@ -431,29 +434,30 @@ inner_loop:
 #           isum |= board[k][j];         // summarize column
 #         }
 #       }
-	li	$s3, 0			# s3 = jsum = 0
-	li	$s4, 0			# s4 = isum = 0
-	li	$s5, 0			# s5 = k = 0
+
+	li	$s3, 0									# s3 = jsum = 0
+	li	$s4, 0									# s4 = isum = 0
+	li	$s5, 0									# s5 = k = 0
 loop_k1:
-	beq	$s5, 16, continue2	# k>=16, then skip the loop
+	beq	$s5, 16, continue2						# k>=16, then skip the loop
 if_k_j:
-	beq	$s5, $s2, if_k_i	# if k==j, check next if
-	sll	$t0, $s5, 1		# offset of k
-	add	$s6, $s6, $t0		# location of board[i][k]
+	beq	$s5, $s2, if_k_i						# if k==j, check next if
+	sll	$t0, $s5, 1								# offset of k
+	add	$s6, $s6, $t0							# location of board[i][k]
 	add	$s6, $s6, $a0
-	lw	$t0, 0($s6)		# board[i][k]
-	or	$s3, $s3, $t0		# jsum = jsum|board[i][k]
+	lw	$t0, 0($s6)								# board[i][k]
+	or	$s3, $s3, $t0							# jsum = jsum|board[i][k]
 if_k_i:
-	beq	$s5, $s1, increment_k1	# if k==i, go to next iteration
-	mul	$t0, $s5, 16		# the start index of row k
-	sll	$t0, $t0, 2		# the start location of row k
-	sll	$s6, $s2, 2		# the offset of col j
-	add	$s6, $s6, $t0		# the location of board[k][j]
+	beq	$s5, $s1, increment_k1					# if k==i, go to next iteration
+	mul	$t0, $s5, 16							# the start index of row k
+	sll	$t0, $t0, 2								# the start location of row k
+	sll	$s6, $s2, 2								# the offset of col j
+	add	$s6, $s6, $t0							# the location of board[k][j]
 	add	$s6, $s6, $a0
-	lw	$t0, 0($s6)		# board[k][j]
-	or	$s4, $s4, $t0		# isum = isum|board[k][j]	
+	lw	$t0, 0($s6)								# board[k][j]
+	or	$s4, $s4, $t0							# isum = isum|board[k][j]	
 increment_k1:
-	add	$s5, $s5, 1		# k++
+	add	$s5, $s5, 1								# k++
 	j	loop_k1		
 
 #       if (ALL_VALUES != jsum) {
@@ -467,18 +471,18 @@ increment_k1:
 #       }
 continue2: 
 	beq	 $s3,ALL_VALUES, else_if	
-	not	$s5, $s3		# ~jsum
-	and	$s5, $s5, ALL_VALUES	# ALL_VALUES & ~jsum
-	sw	$s5, 0($s7)		# board[i][j] = ALL_VALUES & ~jsum
-	li	$s0, 1			# changed = 1
+	not	$s5, $s3								# ~jsum
+	and	$s5, $s5, ALL_VALUES					# ALL_VALUES & ~jsum
+	sw	$s5, 0($s7)								# board[i][j] = ALL_VALUES & ~jsum
+	li	$s0, 1									# changed = 1
 	j	increment_j		
 	
 else_if:
-	beq	$s4,ALL_VALUES, continue_next	# check ALL_VALUES, jsum
-	not	$s5, $s4		# ~jsum
-	and	$s5, $s5, ALL_VALUES	# ALL_VALUES & ~jsum
-	sw	$s5, 0($s7)		# board[i][j] = ALL_VALUES & ~jsum
-	li	$s0, 1			# changed = 1
+	beq	$s4,ALL_VALUES, continue_next			# check ALL_VALUES, jsum
+	not	$s5, $s4								# ~jsum
+	and	$s5, $s5, ALL_VALUES					# ALL_VALUES & ~jsum
+	sw	$s5, 0($s7)								# board[i][j] = ALL_VALUES & ~jsum
+	li	$s0, 1									# changed = 1
 	j	increment_j
 continue_next:
 #       int ii = get_square_begin(i);
@@ -499,36 +503,36 @@ continue_next:
 #       }
 	sw	$a0, 32($sp)
 	sw	$ra, 36($sp)
-	move	$a0, $s1	# a0 = i
-	jal	get_square_begin # get_square_begin(i)
-	move	$s3, $v0	# s3 = ii
+	move	$a0, $s1							# a0 = i
+	jal	get_square_begin 						# get_square_begin(i)
+	move	$s3, $v0							# s3 = ii
 	move	$a0, $s2	
 	jal	get_square_begin
 	lw	$a0, 32($sp)
 	lw	$ra, 36($sp)
-	move	$s4, $v0	# s4 = jj
-	li	$t0, 0		# sum = 0
-	move	$t1, $s3	# t1 = k = ii
-	add	$t6, $s3, 4	# ii+GRIDSIZE
-	add	$t7, $s4, 4	# jj+GRIDSIZE
+	move	$s4, $v0							# s4 = jj
+	li	$t0, 0									# sum = 0
+	move	$t1, $s3							# t1 = k = ii
+	add	$t6, $s3, 4								# ii+GRIDSIZE
+	add	$t7, $s4, 4								# jj+GRIDSIZE
 loop_inner_out:	
-	beq	$t1, $t6, continue_final # k >= ii+GRIDSIZE
-	move	$t2, $s4	 	# t2 = l = jj
+	beq	$t1, $t6, continue_final 				# k >= ii+GRIDSIZE
+	move	$t2, $s4	 						# t2 = l = jj
 loop_innermost:
-	beq	$t2, $t7, increment_k	# l >= jj+GRIDSIZE
-	sub	$t3, $t1, $s1	# k-i
-	sub	$t4, $t2, $s2	# l-j
-	or	$t3, $t3, $t4	# k-i==0 abd l-j==0
-	beq	$t3, 0, increment_j #continue
+	beq	$t2, $t7, increment_k					# l >= jj+GRIDSIZE
+	sub	$t3, $t1, $s1							# k-i
+	sub	$t4, $t2, $s2							# l-j
+	or	$t3, $t3, $t4							# k-i==0 abd l-j==0
+	beq	$t3, 0, increment_j 					#continue
 	
 	move	$t3, $t1	
-	mul	$t3, $t3, 16	#the starting position of row k
-	sll	$t3, $t3, 1	#the offset of row k 
-	sll	$t4, $t2, 1	#the offset of col l
-	add	$t3, $t3, $t4	#the postion of board[k][l]
+	mul	$t3, $t3, 16							#the starting position of row k
+	sll	$t3, $t3, 1								#the offset of row k 
+	sll	$t4, $t2, 1								#the offset of col l
+	add	$t3, $t3, $t4							#the postion of board[k][l]
 	add	$t3, $a0, $t3
-	lhu	$t3, 0($t3)	#t3 = board[k][l]
-	or	$t0, $t0, $t3	#sum = sum|board[k][l]
+	lhu	$t3, 0($t3)								#t3 = board[k][l]
+	or	$t0, $t0, $t3							#sum = sum|board[k][l]
 	 
 	
 increment_l:
@@ -547,10 +551,10 @@ continue_final:
 	li	$s0, 1	
 	
 increment_j:
-	add	$s2, $s2, 1		#j++
+	add	$s2, $s2, 1								#j++
 	j	inner_loop	
 increment_i:	
-	add	$s1, $s1, 1		#i++	
+	add	$s1, $s1, 1								#i++	
 	j	outter_loop2
 return:
 	move	$v0, $s0
@@ -576,7 +580,7 @@ puzzle_solver:
 
 
 ###########################################################################
-#                       main function begin                               #
+#                       main function begins                              #
 ###########################################################################
 main:
         li         $t6, BONK_INT_MASK                       # set up bit mask for bonk
@@ -634,7 +638,7 @@ skip_explore:
 
 
 ###########################################################################
-#                   kerner begin    try not put code here                 #
+#                   kernal begin    try not put code here                 #
 ###########################################################################
 .kdata
 chunkIH:    .space 28
