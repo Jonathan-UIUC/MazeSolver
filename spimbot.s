@@ -81,7 +81,6 @@ loop:
 	jal	rule2		#rule2
 	or	$s0, $s0, $v0
 	beq	$s0, 1, loop
-	beq	$v0, 1, loop
 
 solved_end:
 	lw	$s0, 0($sp)
@@ -507,6 +506,8 @@ rule2:
 	sw	$ra, 36($sp)							# save ra
 	li	$s0, 0									# Changed == False
 	li	$s1, 0									# iter i
+	sw	$a0, 32($sp)							# save a0
+	sw	$ra, 36($sp)							# save ra
 outter_loop2:
 	beq	$s1, 16, return							# i >= 16, return
 	li	$s2, 0									# j = 0
@@ -624,6 +625,7 @@ continue_next:
 	move	$t1, $s3							# t1 = k = ii
 	add	$t6, $s3, 4								# ii+GRIDSIZE
 	add	$s5, $s4, 4								# jj+GRIDSIZE
+
 loop_inner_out:
 	beq	$t1, $t6, continue_final 				# k >= ii+GRIDSIZE
 	move	$t2, $s4	 						# t2 = l = jj
@@ -858,6 +860,7 @@ explore_loop_initial:
 		lw         $t6, TIMER($0)                           # get current time
 		add        $t6, $t6, 10000                          # request 10000 cycle interrupt
 		sw         $t6, TIMER($0)                           # request interrupt
+
 
 explore_loop:
         lw         $t1, RIGHT_WALL_SENSOR($0)               # t1 = right_wall_sensor
