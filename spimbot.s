@@ -59,12 +59,10 @@ treasure_map:           .word 101
 ###########################################################################
 #                     self-defined functions 		                      #
 ###########################################################################
-<<<<<<< HEAD
 
-# function: solved(&board):
-=======
+
 #function: solved(&board):
->>>>>>> baedde5f64aa1982a7e006a1970069ec76f07641
+#>>>>>>> baedde5f64aa1982a7e006a1970069ec76f07641
 #  do {
 #    changed = rule1(board);
 #    changed |= rule2(board);
@@ -73,39 +71,26 @@ solved:
 	sub	$sp, $sp, 12
 	sw	$s0, 0($sp)
 	sw	$ra, 4($sp)
-<<<<<<< HEAD
+
 	sw	$a0, 8($sp)
 loop:
 	lw	$a0, 8($sp)
 	jal	rule1		#rule1
-	move	$s0, $v0	#changed = $s0 = rule1(board)
-	# lw	$a0, 8($sp)
-	# jal	rule2		#rule2
-	# or	$s0, $s0, $v0
-	beq	$s0, 1, loop
-solved_end:
-=======
-	sw	$a0, 8($sp)	
-loop:	
-	lw	$a0, 8($sp)
-	jal	rule1		#rule1
-	move	$s0, $v0	#changed = $s0 = rule1(board)
-	lw	$a0, 8($sp)	
+#	move	$s0,$v0	#changed = $s0 = rule1(board)
+	
 	jal	rule2		#rule2
-	or	$s0, $s0, $v0
-	beq	$s0, 1, loop
-end:	
->>>>>>> baedde5f64aa1982a7e006a1970069ec76f07641
+	jal	rule1	
+#	or	$s0, $s0, $v0
+#	beq	$s0, 1, loop
+solved_end:
+#=======
+	sw	$a0, 8($sp)	
 	lw	$s0, 0($sp)
 	lw	$ra, 4($sp)
 	lw	$a0, 8($sp)
 	add	$sp, $sp, 12
-<<<<<<< HEAD
-    jr  $ra
-
-=======
 	jr	$ra 
->>>>>>> baedde5f64aa1982a7e006a1970069ec76f07641
+
 # this function in C code: bool find_has_treasure(int x, int y);
 # take in two parameters x and y, which are spimbot current location and return
 # whether current location has treasure. 1 if has 0 if there is no treasure.
@@ -479,7 +464,7 @@ jr $ra
 # }
 
 rule2:
-	sub	$sp, $sp, 40
+	sub	$sp, $sp, 48
 	sw	$s0, 0($sp)
 	sw	$s1, 4($sp)
 	sw	$s2, 8($sp)
@@ -535,9 +520,13 @@ loop_k1:
 	beq	$s5, 16, continue2						# k>=16, then skip the loop
 if_k_j:
 	beq	$s5, $s2, if_k_i						# if k==j, check next if
-	sll	$t0, $s5, 1								# offset of k
+	sll	$t0, $s5, 1
+	move	$s6, $s1
+	mul	$s6, $s6, 16
+	sll	$s6, $s6,1							# offset of k
+
 	add	$s6, $s6, $t0							# location of board[i][k]
-	add	$s6, $s6, $a0
+	add	$s6, $s6, $a0	
 	lhu	$t0, 0($s6)								# board[i][k]
 	or	$s3, $s3, $t0							# jsum = jsum|board[i][k]
 if_k_i:
@@ -590,10 +579,7 @@ continue_next:
 #         }
 #       }
 #
-#       if (ALL_VALUES != sum) {
-#         board[i][j] = ALL_VALUES & ~sum;
-#         changed = true;
-#       }
+
 	sw	$a0, 32($sp)
 	sw	$ra, 36($sp)
 	move	$a0, $s1							# a0 = i
@@ -616,7 +602,7 @@ loop_innermost:
 	sub	$t3, $t1, $s1							# k-i
 	sub	$t4, $t2, $s2							# l-j
 	or	$t3, $t3, $t4							# k-i==0 abd l-j==0
-	beq	$t3, 0, increment_j 					#continue
+	beq	$t3, 0, increment_l 					#continue
 
 	move	$t3, $t1
 	mul	$t3, $t3, 16							#the starting position of row k
@@ -635,11 +621,14 @@ increment_l:
 increment_k:
 	add	$t1, $t1, 1
 	j	loop_inner_out
-
+#       if (ALL_VALUES != sum) {
+#         board[i][j] = ALL_VALUES & ~sum;
+#         changed = true;
+#       }
 continue_final:
 	beq	$t0,ALL_VALUES, increment_j
 	not	$t0, $t0
-	add	$t0, $t0, ALL_VALUES
+	and	$t0, $t0, ALL_VALUES
 	sh	$t0, 0($s7)
 	li	$s0, 1
 
@@ -660,7 +649,7 @@ return:
 	lw	$s5, 20($sp)
 	lw	$s6, 24($sp)
 	lw	$s7, 28($sp)
-	add	$sp, $sp, 40
+	add	$sp, $sp, 48
 	jr	$ra
 
 ###########################################################################
@@ -695,7 +684,7 @@ main:
         sw         $t6, TIMER($0)                           # request interrupt
         li         $t5, 0                                   # the checker of whether puzzle is ready
         la         $t4, puzzle                              # load the address of the puzzle we need to store into
-        li         $t3, 10                                  # the counter, we need to solve at least 10 puzzle
+        li         $t3, 1                                  # the counter, we need to solve at least 10 puzzle
 
 get_20_keys_loop_request_puzzle:
         sw         $t4, REQUEST_PUZZLE($0)                  # store puzzle to the memory IO to request puzzle
@@ -928,3 +917,5 @@ done:
         move    $at, $k1                        # Restore $at
 .set at
         eret
+
+
