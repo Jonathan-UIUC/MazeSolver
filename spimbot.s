@@ -59,14 +59,10 @@ treasure_map:           .word 101
 ###########################################################################
 #                     self-defined functions 		                      #
 ###########################################################################
-<<<<<<< HEAD
-#function: solved(&board):
-=======
 
 
 #function: solved(&board):
 #>>>>>>> baedde5f64aa1982a7e006a1970069ec76f07641
->>>>>>> 37e0e8a6ed5d229f85e804b905625eb840888085
 #  do {
 #    changed = rule1(board);
 #    changed |= rule2(board);
@@ -75,42 +71,26 @@ solved:
 	sub	$sp, $sp, 12
 	sw	$s0, 0($sp)
 	sw	$ra, 4($sp)
-<<<<<<< HEAD
-=======
 
->>>>>>> 37e0e8a6ed5d229f85e804b905625eb840888085
 	sw	$a0, 8($sp)
 loop:
 	lw	$a0, 8($sp)
 	jal	rule1		#rule1
-<<<<<<< HEAD
-	move	$s0, $v0	#changed = $s0 = rule1(board)
-	lw	$a0, 8($sp)
-	jal	rule2		#rule2
-	or	$s0, $s0, $v0
-	beq	$s0, 1, loop
-end:
-=======
 #	move	$s0,$v0	#changed = $s0 = rule1(board)
-	
+
 	jal	rule2		#rule2
-	jal	rule1	
+	jal	rule1
 #	or	$s0, $s0, $v0
 #	beq	$s0, 1, loop
 solved_end:
 #=======
-	sw	$a0, 8($sp)	
->>>>>>> 37e0e8a6ed5d229f85e804b905625eb840888085
+	sw	$a0, 8($sp)
 	lw	$s0, 0($sp)
 	lw	$ra, 4($sp)
 	lw	$a0, 8($sp)
 	add	$sp, $sp, 12
-<<<<<<< HEAD
 	jr	$ra
-=======
-	jr	$ra 
 
->>>>>>> 37e0e8a6ed5d229f85e804b905625eb840888085
 # this function in C code: bool find_has_treasure(int x, int y);
 # take in two parameters x and y, which are spimbot current location and return
 # whether current location has treasure. 1 if has 0 if there is no treasure.
@@ -546,7 +526,7 @@ if_k_j:
 	sll	$s6, $s6,1							# offset of k
 
 	add	$s6, $s6, $t0							# location of board[i][k]
-	add	$s6, $s6, $a0	
+	add	$s6, $s6, $a0
 	lhu	$t0, 0($s6)								# board[i][k]
 	or	$s3, $s3, $t0							# jsum = jsum|board[i][k]
 if_k_i:
@@ -936,6 +916,4 @@ done:
 .set noat
         move    $at, $k1                        # Restore $at
 .set at
-        eret
-
-
+		eret
