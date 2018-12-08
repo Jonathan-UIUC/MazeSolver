@@ -52,6 +52,7 @@ ALL_VALUES 		= 0xffff
 .align 4
 puzzle:                 .word 128
 treasure_map:           .word 101
+has_right_wall:         .word 1
 
 ###########################################################################
 
@@ -60,9 +61,7 @@ treasure_map:           .word 101
 #                     self-defined functions 		                      #
 ###########################################################################
 
-
-#function: solved(&board):
-#>>>>>>> baedde5f64aa1982a7e006a1970069ec76f07641
+# function: solved(&board):
 #  do {
 #    changed = rule1(board);
 #    changed |= rule2(board);
@@ -71,29 +70,23 @@ solved:
 	sub	$sp, $sp, 12
 	sw	$s0, 0($sp)
 	sw	$ra, 4($sp)
-
 	sw	$a0, 8($sp)
 loop:
 	lw	$a0, 8($sp)
-	jal	rule1		#rule1
-#	move	$s0,$v0	#changed = $s0 = rule1(board)
-
+	# jal	rule1		#rule1
+	# move	$s0, $v0	#changed = $s0 = rule1(board)
+#	lw	$a0, 8($sp)
 	jal	rule2		#rule2
-	jal	rule1
-#	or	$s0, $s0, $v0
-#	beq	$s0, 1, loop
+	#or	$s0, $s0, $v0
+	#beq	$s0, 1, loop
+	beq	$v0, 1, loop
+
 solved_end:
-#=======
-	sw	$a0, 8($sp)
 	lw	$s0, 0($sp)
 	lw	$ra, 4($sp)
 	lw	$a0, 8($sp)
 	add	$sp, $sp, 12
-	jr	$ra
-
-# this function in C code: bool find_has_treasure(int x, int y);
-# take in two parameters x and y, which are spimbot current location and return
-# whether current location has treasure. 1 if has 0 if there is no treasure.
+    jr  $ra
 
 # while (lo <= hi) {
 #     m = (lo + hi) / 2;
@@ -191,8 +184,7 @@ end_check_treasure_loop:
         lw         $s6, 28($sp)
         lw         $s7, 32($sp)
         add        $sp, $sp, 36                             # delocate memory
-        jr         $ra                                      # return
-
+		jr 		   $ra 										# return
 ###########################################################################
 #                       The rule 1 they give us                           #
 ###########################################################################
@@ -273,6 +265,42 @@ elimination:
 	li 		$s2, 0						# k = 0
 
 second_inner_loop:
+#     ## ADD turn right here
+#     sub     $sp, $sp, 16
+#     sw      $s0, 0($sp)
+#     sw      $s1, 4($sp)
+#     sw      $s2, 8($sp)
+#     sw      $s3, 12($sp)
+#     sw      $s4, 16($sp)
+#     move    $s4, $at
+#
+#     la      $s0, has_right_wall
+#     lw      $s0, 0($s0)
+#     lw      $s1, RIGHT_WALL_SENSOR($0)  # t1 = right_wall_sensor
+#     not 	$s2, $s1					# ~right_wall_sensor
+#     and 	$s2, $s2, $s0				# ~right_wall_sensor & t2
+#     beq     $s2, $0, turn_right_skip    # no wall
+#     li      $s3, 90                     # turn angle
+#     sw      $s3, ANGLE($0)
+#     sw      $0, ANGLE_CONTROL($0)      	# relatively turn 90
+#     lw      $s0, RIGHT_WALL_SENSOR($0)  # t2 = right_wall_sensor
+#     la      $s2, has_right_wall
+#     sw      $s0, 0($s2)
+#     j       turn_right_end
+# turn_right_skip:
+#     move    $s0, $s1
+#     la      $s1, has_right_wall
+#     sw      $s0, 0($s1)
+# turn_right_end:
+#     move    $at, $s4
+#     lw      $s0, 0($sp)
+#     lw      $s1, 4($sp)
+#     lw      $s2, 8($sp)
+#     lw      $s3, 12($sp)
+#     lw      $s4, 16($sp)
+#
+#     add     $sp, $sp, 2-0
+#     ##========================
 	bge 	$s2, 16, end_2nd_inner_loop # k >= GRID_SQUARED;
 	bne 	$s2, $s1, eliminate_row 	# if (k != j) eliminate_row
 keep_going:
@@ -464,7 +492,7 @@ jr $ra
 # }
 
 rule2:
-	sub	$sp, $sp, 48
+	sub	$sp, $sp, 40
 	sw	$s0, 0($sp)
 	sw	$s1, 4($sp)
 	sw	$s2, 8($sp)
@@ -475,6 +503,8 @@ rule2:
 	sw	$s7, 28($sp)
 	li	$s0, 0									# Changed == False
 	li	$s1, 0									# iter i
+	sw	$a0, 32($sp)							# save a0
+	sw	$ra, 36($sp)							# save ra
 outter_loop2:
 	beq	$s1, 16, return							# i >= 16, return
 	li	$s2, 0									# j = 0
@@ -494,8 +524,6 @@ inner_loop:
 	lhu	$s3, 0($s7)								# value = board[i][j]
 
 #start check if
-	sw	$a0, 32($sp)							# save a0
-	sw	$ra, 36($sp)							# save ra
 	move	$a0, $s3
 	jal	has_single_bit_set						# call has a single bit
 	lw	$a0, 32($sp)
@@ -532,8 +560,8 @@ if_k_j:
 if_k_i:
 	beq	$s5, $s1, increment_k1					# if k==i, go to next iteration
 	mul	$t0, $s5, 16							# the start index of row k
-	sll	$t0, $t0, 2								# the start location of row k
-	sll	$s6, $s2, 2								# the offset of col j
+	sll	$t0, $t0, 1								# the start location of row k
+	sll	$s6, $s2, 1								# the offset of col j
 	add	$s6, $s6, $t0							# the location of board[k][j]
 	add	$s6, $s6, $a0
 	lhu	$t0, 0($s6)								# board[k][j]
@@ -580,8 +608,8 @@ continue_next:
 #       }
 #
 
-	sw	$a0, 32($sp)
-	sw	$ra, 36($sp)
+	# sw	$a0, 32($sp)
+	# sw	$ra, 36($sp)
 	move	$a0, $s1							# a0 = i
 	jal	get_square_begin 						# get_square_begin(i)
 	move	$s3, $v0							# s3 = ii
@@ -601,7 +629,7 @@ loop_innermost:
 	beq	$t2, $t7, increment_k					# l >= jj+GRIDSIZE
 	sub	$t3, $t1, $s1							# k-i
 	sub	$t4, $t2, $s2							# l-j
-	or	$t3, $t3, $t4							# k-i==0 abd l-j==0
+	or	$t3, $t3, $t4							# k-i==0 and l-j==0
 	beq	$t3, 0, increment_l 					#continue
 
 	move	$t3, $t1
@@ -649,7 +677,7 @@ return:
 	lw	$s5, 20($sp)
 	lw	$s6, 24($sp)
 	lw	$s7, 28($sp)
-	add	$sp, $sp, 48
+	add	$sp, $sp, 40
 	jr	$ra
 
 ###########################################################################
@@ -684,7 +712,7 @@ main:
         sw         $t6, TIMER($0)                           # request interrupt
         li         $t5, 0                                   # the checker of whether puzzle is ready
         la         $t4, puzzle                              # load the address of the puzzle we need to store into
-        li         $t3, 1                                  # the counter, we need to solve at least 10 puzzle
+        li         $t3, 10                                  # the counter, we need to solve at least 10 puzzle
 
 get_20_keys_loop_request_puzzle:
         sw         $t4, REQUEST_PUZZLE($0)                  # store puzzle to the memory IO to request puzzle
@@ -708,7 +736,7 @@ get_20_keys_loop:
         sw         $t1, 48($sp)
         sw         $t2, 52($sp)
         move       $a0, $t4
-        jal        solved
+        jal        rule2
         lw         $ra, 0($sp)
         lw         $a0, 4($sp)
         lw         $v0, 8($sp)
@@ -724,70 +752,70 @@ get_20_keys_loop:
         lw         $t1, 48($sp)
         lw         $t2, 52($sp)
         add        $sp, $sp, 56                             # delocate memory
-        # sub        $sp, $sp, 56                             # allocate memory
-        # sw         $ra, 0($sp)
-        # sw         $a0, 4($sp)
-        # sw         $v0, 8($sp)
-        # sw         $s0, 12($sp)
-        # sw         $s1, 16($sp)
-        # sw         $s2, 20($sp)                             # all of those are fucking unsolved registers from rule 1
-        # sw         $s3, 24($sp)
-        # sw         $s4, 28($sp)
-        # sw         $s5, 32($sp)
-        # sw         $s6, 36($sp)
-        # sw         $s7, 40($sp)
-        # sw         $t0, 44($sp)
-        # sw         $t1, 48($sp)
-        # sw         $t2, 52($sp)
-        # move       $a0, $t4
-        # jal        rule1
-        # lw         $ra, 0($sp)
-        # lw         $a0, 4($sp)
-        # lw         $v0, 8($sp)
-        # lw         $s0, 12($sp)
-        # lw         $s1, 16($sp)
-        # lw         $s2, 20($sp)                             # restore all of those are fucking unsolved registers from rule 1
-        # lw         $s3, 24($sp)
-        # lw         $s4, 28($sp)
-        # lw         $s5, 32($sp)
-        # lw         $s6, 36($sp)
-        # lw         $s7, 40($sp)
-        # lw         $t0, 44($sp)
-        # lw         $t1, 48($sp)
-        # lw         $t2, 52($sp)
-        # add        $sp, $sp, 56                             # delocate memory
-        # sub        $sp, $sp, 56                             # allocate memory
-        # sw         $ra, 0($sp)
-        # sw         $a0, 4($sp)
-        # sw         $v0, 8($sp)
-        # sw         $s0, 12($sp)
-        # sw         $s1, 16($sp)
-        # sw         $s2, 20($sp)                             # all of those are fucking unsolved registers from rule 1
-        # sw         $s3, 24($sp)
-        # sw         $s4, 28($sp)
-        # sw         $s5, 32($sp)
-        # sw         $s6, 36($sp)
-        # sw         $s7, 40($sp)
-        # sw         $t0, 44($sp)
-        # sw         $t1, 48($sp)
-        # sw         $t2, 52($sp)
-        # move       $a0, $t4
-        # jal        rule1
-        # lw         $ra, 0($sp)
-        # lw         $a0, 4($sp)
-        # lw         $v0, 8($sp)
-        # lw         $s0, 12($sp)
-        # lw         $s1, 16($sp)
-        # lw         $s2, 20($sp)                             # restore all of those are fucking unsolved registers from rule 1
-        # lw         $s3, 24($sp)
-        # lw         $s4, 28($sp)
-        # lw         $s5, 32($sp)
-        # lw         $s6, 36($sp)
-        # lw         $s7, 40($sp)
-        # lw         $t0, 44($sp)
-        # lw         $t1, 48($sp)
-        # lw         $t2, 52($sp)
-        # add        $sp, $sp, 56                             # delocate memory
+        sub        $sp, $sp, 56                             # allocate memory
+        sw         $ra, 0($sp)
+        sw         $a0, 4($sp)
+        sw         $v0, 8($sp)
+        sw         $s0, 12($sp)
+        sw         $s1, 16($sp)
+        sw         $s2, 20($sp)                             # all of those are fucking unsolved registers from rule 1
+        sw         $s3, 24($sp)
+        sw         $s4, 28($sp)
+        sw         $s5, 32($sp)
+        sw         $s6, 36($sp)
+        sw         $s7, 40($sp)
+        sw         $t0, 44($sp)
+        sw         $t1, 48($sp)
+        sw         $t2, 52($sp)
+        move       $a0, $t4
+        jal        rule2
+        lw         $ra, 0($sp)
+        lw         $a0, 4($sp)
+        lw         $v0, 8($sp)
+        lw         $s0, 12($sp)
+        lw         $s1, 16($sp)
+        lw         $s2, 20($sp)                             # restore all of those are fucking unsolved registers from rule 1
+        lw         $s3, 24($sp)
+        lw         $s4, 28($sp)
+        lw         $s5, 32($sp)
+        lw         $s6, 36($sp)
+        lw         $s7, 40($sp)
+        lw         $t0, 44($sp)
+        lw         $t1, 48($sp)
+        lw         $t2, 52($sp)
+        add        $sp, $sp, 56                             # delocate memory
+        sub        $sp, $sp, 56                             # allocate memory
+        sw         $ra, 0($sp)
+        sw         $a0, 4($sp)
+        sw         $v0, 8($sp)
+        sw         $s0, 12($sp)
+        sw         $s1, 16($sp)
+        sw         $s2, 20($sp)                             # all of those are fucking unsolved registers from rule 1
+        sw         $s3, 24($sp)
+        sw         $s4, 28($sp)
+        sw         $s5, 32($sp)
+        sw         $s6, 36($sp)
+        sw         $s7, 40($sp)
+        sw         $t0, 44($sp)
+        sw         $t1, 48($sp)
+        sw         $t2, 52($sp)
+        move       $a0, $t4
+        jal        rule2
+        lw         $ra, 0($sp)
+        lw         $a0, 4($sp)
+        lw         $v0, 8($sp)
+        lw         $s0, 12($sp)
+        lw         $s1, 16($sp)
+        lw         $s2, 20($sp)                             # restore all of those are fucking unsolved registers from rule 1
+        lw         $s3, 24($sp)
+        lw         $s4, 28($sp)
+        lw         $s5, 32($sp)
+        lw         $s6, 36($sp)
+        lw         $s7, 40($sp)
+        lw         $t0, 44($sp)
+        lw         $t1, 48($sp)
+        lw         $t2, 52($sp)
+        add        $sp, $sp, 56                             # delocate memory
         la         $t6, puzzle                               # load solution address
         sw         $t6, SUBMIT_SOLUTION                      # SUBMIT_SOLUTION
         li         $t5, 0                                   # set back checker and request another puzzle
