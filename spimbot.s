@@ -59,7 +59,30 @@ treasure_map:           .word 101
 ###########################################################################
 #                     self-defined functions 		                      #
 ###########################################################################
-
+#function: solved(&board):
+#  do {
+#    changed = rule1(board);
+#    changed |= rule2(board);
+#  } while (changed);
+solved:
+	sub	$sp, $sp, 12
+	sw	$s0, 0($sp)
+	sw	$ra, 4($sp)
+	sw	$a0, 8($sp)	
+loop:	
+	lw	$a0, 8($sp)
+	jal	rule1		#rule1
+	move	$s0, $v0	#changed = $s0 = rule1(board)
+	lw	$a0, 8($sp)	
+	jal	rule2		#rule2
+	or	$s0, $s0, $v0
+	beq	$s0, 1, loop
+end:	
+	lw	$s0, 0($sp)
+	lw	$ra, 4($sp)
+	lw	$a0, 8($sp)
+	add	$sp, $sp, 12
+	jr	$ra 
 # this function in C code: bool find_has_treasure(int x, int y);
 # take in two parameters x and y, which are spimbot current location and return
 # whether current location has treasure. 1 if has 0 if there is no treasure.
