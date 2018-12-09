@@ -1,6 +1,6 @@
 optimize the puzzle solving by eliminate the must have case. 
-implement rule 2.
-use static variable rather than register for the puzzle checker.
-"puzzle_state .word 0"
-pipeline puzzle solve and pathfinding
+implement rule 2. (done)
+use static variable rather than register for the puzzle checker. (kind of done)
+***pipeline puzzle solve and pathfinding****
+queue the request puzzle and solvings
 "Spim_state .word 0" to keep track of the finite state machine.

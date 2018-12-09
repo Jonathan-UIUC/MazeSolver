@@ -53,6 +53,8 @@ ALL_VALUES 		= 0xffff
 puzzle:                 .word 128
 treasure_map:           .word 101
 has_right_wall:         .word 1
+# request_puzzle_ready:  	.word 1
+# timer_inter_ready:      .word 1
 
 ###########################################################################
 
@@ -73,13 +75,12 @@ solved:
 	sw	$a0, 8($sp)
 loop:
 	lw	$a0, 8($sp)
-	# jal	rule1		#rule1
-	# move	$s0, $v0	#changed = $s0 = rule1(board)
-#	lw	$a0, 8($sp)
+	jal	rule1		#rule1
+	move	$s0, $v0	#changed = $s0 = rule1(board)
+	lw	$a0, 8($sp)
 	jal	rule2		#rule2
-	#or	$s0, $s0, $v0
-	#beq	$s0, 1, loop
-	beq	$v0, 1, loop
+	or	$s0, $s0, $v0
+	beq	$s0, 1, loop
 
 solved_end:
 	lw	$s0, 0($sp)
@@ -501,6 +502,8 @@ rule2:
 	sw	$s5, 20($sp)
 	sw	$s6, 24($sp)
 	sw	$s7, 28($sp)
+	sw	$a0, 32($sp)							# save a0
+	sw	$ra, 36($sp)							# save ra
 	li	$s0, 0									# Changed == False
 	li	$s1, 0									# iter i
 	sw	$a0, 32($sp)							# save a0
@@ -621,12 +624,13 @@ continue_next:
 	li	$t0, 0									# sum = 0
 	move	$t1, $s3							# t1 = k = ii
 	add	$t6, $s3, 4								# ii+GRIDSIZE
-	add	$t7, $s4, 4								# jj+GRIDSIZE
+	add	$s5, $s4, 4								# jj+GRIDSIZE
+
 loop_inner_out:
 	beq	$t1, $t6, continue_final 				# k >= ii+GRIDSIZE
 	move	$t2, $s4	 						# t2 = l = jj
 loop_innermost:
-	beq	$t2, $t7, increment_k					# l >= jj+GRIDSIZE
+	bge	$t2, $s5, increment_k					# l >= jj+GRIDSIZE
 	sub	$t3, $t1, $s1							# k-i
 	sub	$t4, $t2, $s2							# l-j
 	or	$t3, $t3, $t4							# k-i==0 and l-j==0
@@ -677,6 +681,8 @@ return:
 	lw	$s5, 20($sp)
 	lw	$s6, 24($sp)
 	lw	$s7, 28($sp)
+	lw	$a0, 32($sp)							# save a0
+	lw	$ra, 36($sp)							# save ra
 	add	$sp, $sp, 40
 	jr	$ra
 
@@ -706,21 +712,30 @@ main:
         li         $t0, 10                                  # t0 = velocity of the spimBot
         sw         $t0, VELOCITY($0)                        # set the velocity of the spimBot
         li         $t2, 1                                   # set initial has right wall
-        li         $t7, 0                                   # timer interrupt checker = 0;
-        lw         $t6, TIMER($0)                           # get current time
-        add        $t6, $t6, 10000                          # request 10000 cycle interrupt
-        sw         $t6, TIMER($0)                           # request interrupt
-        li         $t5, 0                                   # the checker of whether puzzle is ready
+		# la 		   $t6, timer_inter_ready
+        # li         $t5, 0                                   # the checker of whether puzzle is ready
+		# sw 		   $t5, 0($t6)
+		# li 		   $t7, 0 									# change
+        # lw         $t6, TIMER($0)                           # get current time
+        # add        $t6, $t6, 10000                          # request 10000 cycle interrupt
+        # sw         $t6, TIMER($0)                           # request interrupt
+		# la 		   $t6, request_puzzle_ready
+        # li         $t5, 0                                   # the checker of whether puzzle is ready
+		# sw 		   $t5, 0($t6)
+		li 		   $t5, 0									# change
         la         $t4, puzzle                              # load the address of the puzzle we need to store into
         li         $t3, 10                                  # the counter, we need to solve at least 10 puzzle
 
 get_20_keys_loop_request_puzzle:
         sw         $t4, REQUEST_PUZZLE($0)                  # store puzzle to the memory IO to request puzzle
-        ble        $t3, $0, explore_loop                    # get 20 keys
+        ble        $t3, $0, explore_loop_initial                    # get 20 keys
 
 get_20_keys_loop:
+		# la 		   $t6, request_puzzle_ready
+		# lw         $t5, 0($t6)                                   # the checker of whether puzzle is ready
+
         beq        $t5, $0, get_20_keys_loop                # the puzzle is not ready yet
-        sub        $sp, $sp, 56                             # allocate memory
+        sub        $sp, $sp, 76                             # allocate memory
         sw         $ra, 0($sp)
         sw         $a0, 4($sp)
         sw         $v0, 8($sp)
@@ -735,8 +750,13 @@ get_20_keys_loop:
         sw         $t0, 44($sp)
         sw         $t1, 48($sp)
         sw         $t2, 52($sp)
+		sw         $t3, 56($sp)
+		sw 		   $t4, 60($sp)
+		lw 		   $t5, 64($sp)
+		lw         $t6, 68($sp)
+		lw         $t7, 72($sp)
         move       $a0, $t4
-        jal        rule2
+        jal        solved
         lw         $ra, 0($sp)
         lw         $a0, 4($sp)
         lw         $v0, 8($sp)
@@ -751,84 +771,108 @@ get_20_keys_loop:
         lw         $t0, 44($sp)
         lw         $t1, 48($sp)
         lw         $t2, 52($sp)
-        add        $sp, $sp, 56                             # delocate memory
-        sub        $sp, $sp, 56                             # allocate memory
-        sw         $ra, 0($sp)
-        sw         $a0, 4($sp)
-        sw         $v0, 8($sp)
-        sw         $s0, 12($sp)
-        sw         $s1, 16($sp)
-        sw         $s2, 20($sp)                             # all of those are fucking unsolved registers from rule 1
-        sw         $s3, 24($sp)
-        sw         $s4, 28($sp)
-        sw         $s5, 32($sp)
-        sw         $s6, 36($sp)
-        sw         $s7, 40($sp)
-        sw         $t0, 44($sp)
-        sw         $t1, 48($sp)
-        sw         $t2, 52($sp)
-        move       $a0, $t4
-        jal        rule2
-        lw         $ra, 0($sp)
-        lw         $a0, 4($sp)
-        lw         $v0, 8($sp)
-        lw         $s0, 12($sp)
-        lw         $s1, 16($sp)
-        lw         $s2, 20($sp)                             # restore all of those are fucking unsolved registers from rule 1
-        lw         $s3, 24($sp)
-        lw         $s4, 28($sp)
-        lw         $s5, 32($sp)
-        lw         $s6, 36($sp)
-        lw         $s7, 40($sp)
-        lw         $t0, 44($sp)
-        lw         $t1, 48($sp)
-        lw         $t2, 52($sp)
-        add        $sp, $sp, 56                             # delocate memory
-        sub        $sp, $sp, 56                             # allocate memory
-        sw         $ra, 0($sp)
-        sw         $a0, 4($sp)
-        sw         $v0, 8($sp)
-        sw         $s0, 12($sp)
-        sw         $s1, 16($sp)
-        sw         $s2, 20($sp)                             # all of those are fucking unsolved registers from rule 1
-        sw         $s3, 24($sp)
-        sw         $s4, 28($sp)
-        sw         $s5, 32($sp)
-        sw         $s6, 36($sp)
-        sw         $s7, 40($sp)
-        sw         $t0, 44($sp)
-        sw         $t1, 48($sp)
-        sw         $t2, 52($sp)
-        move       $a0, $t4
-        jal        rule2
-        lw         $ra, 0($sp)
-        lw         $a0, 4($sp)
-        lw         $v0, 8($sp)
-        lw         $s0, 12($sp)
-        lw         $s1, 16($sp)
-        lw         $s2, 20($sp)                             # restore all of those are fucking unsolved registers from rule 1
-        lw         $s3, 24($sp)
-        lw         $s4, 28($sp)
-        lw         $s5, 32($sp)
-        lw         $s6, 36($sp)
-        lw         $s7, 40($sp)
-        lw         $t0, 44($sp)
-        lw         $t1, 48($sp)
-        lw         $t2, 52($sp)
-        add        $sp, $sp, 56                             # delocate memory
+		lw         $t3, 56($sp)
+		lw         $t4, 60($sp)
+		lw 		   $t5, 64($sp)
+		lw         $t6, 68($sp)
+		lw         $t7, 72($sp)
+		#lw         $t4, 60($sp)
+		# lw         $t6, 64($sp)
+        add        $sp, $sp, 76                             # delocate memory
+
+		# sub        $sp, $sp, 56                             # allocate memory
+        # sw         $ra, 0($sp)
+        # sw         $a0, 4($sp)
+        # sw         $v0, 8($sp)
+        # sw         $s0, 12($sp)
+        # sw         $s1, 16($sp)
+        # sw         $s2, 20($sp)                             # all of those are fucking unsolved registers from rule 1
+        # sw         $s3, 24($sp)
+        # sw         $s4, 28($sp)
+        # sw         $s5, 32($sp)
+        # sw         $s6, 36($sp)
+        # sw         $s7, 40($sp)
+        # sw         $t0, 44($sp)
+        # sw         $t1, 48($sp)
+        # sw         $t2, 52($sp)
+        # move       $a0, $t4
+        # jal        rule1
+        # lw         $ra, 0($sp)
+        # lw         $a0, 4($sp)
+        # lw         $v0, 8($sp)
+        # lw         $s0, 12($sp)
+        # lw         $s1, 16($sp)
+        # lw         $s2, 20($sp)                             # restore all of those are fucking unsolved registers from rule 1
+        # lw         $s3, 24($sp)
+        # lw         $s4, 28($sp)
+        # lw         $s5, 32($sp)
+        # lw         $s6, 36($sp)
+        # lw         $s7, 40($sp)
+        # lw         $t0, 44($sp)
+        # lw         $t1, 48($sp)
+        # lw         $t2, 52($sp)
+        # add        $sp, $sp, 56                             # delocate memory
+		#
+		# sub        $sp, $sp, 56                             # allocate memory
+        # sw         $ra, 0($sp)
+        # sw         $a0, 4($sp)
+        # sw         $v0, 8($sp)
+        # sw         $s0, 12($sp)
+        # sw         $s1, 16($sp)
+        # sw         $s2, 20($sp)                             # all of those are fucking unsolved registers from rule 1
+        # sw         $s3, 24($sp)
+        # sw         $s4, 28($sp)
+        # sw         $s5, 32($sp)
+        # sw         $s6, 36($sp)
+        # sw         $s7, 40($sp)
+        # sw         $t0, 44($sp)
+        # sw         $t1, 48($sp)
+        # sw         $t2, 52($sp)
+        # move       $a0, $t4
+        # jal        rule1
+        # lw         $ra, 0($sp)
+        # lw         $a0, 4($sp)
+        # lw         $v0, 8($sp)
+        # lw         $s0, 12($sp)
+        # lw         $s1, 16($sp)
+        # lw         $s2, 20($sp)                             # restore all of those are fucking unsolved registers from rule 1
+        # lw         $s3, 24($sp)
+        # lw         $s4, 28($sp)
+        # lw         $s5, 32($sp)
+        # lw         $s6, 36($sp)
+        # lw         $s7, 40($sp)
+        # lw         $t0, 44($sp)
+        # lw         $t1, 48($sp)
+        # lw         $t2, 52($sp)
+        # add        $sp, $sp, 56                             # delocate memory
+
         la         $t6, puzzle                               # load solution address
         sw         $t6, SUBMIT_SOLUTION                      # SUBMIT_SOLUTION
-        li         $t5, 0                                   # set back checker and request another puzzle
+		# la 		   $t6, request_puzzle_ready
+        # li         $t5, 0                                   # the checker of whether puzzle is ready
+		# sw 		   $t5, 0($t6)                              # set back checker and request another puzzle
+		li 		   $t5, 0
         sub        $t3, $t3, 1                              # counter--
         j          get_20_keys_loop_request_puzzle
 
+explore_loop_initial:
+		li 		   $t7, 0 									# change
+		lw         $t6, TIMER($0)                           # get current time
+		add        $t6, $t6, 10000                          # request 10000 cycle interrupt
+		sw         $t6, TIMER($0)                           # request interrupt
+
+
 explore_loop:
         lw         $t1, RIGHT_WALL_SENSOR($0)               # t1 = right_wall_sensor
-
+		# la 		   $t0, request_puzzle_ready
+		# lw 		   $t7, 0($t0)
         bne        $t7, 1, continue                         # we still in the same block
         li         $t0, 0                                   # t0 = velocity of the spimBot
         sw         $t0, VELOCITY($0)                        # set the velocity of the spimBot
-        li         $t7, 0
+		# la 		   $t0, request_puzzle_ready
+        # li         $t7, 0
+		# sw 		   $t7, 0($t0)
+		li 		   $t7, 0
         sub        $sp, $sp, 4                              # allocate memory
         sw         $ra, 0($sp)                              # store ra
         lw         $t3, BOT_X($0)                           # t3 = BOT_X
@@ -882,6 +926,8 @@ interrupt_handler:
         sw         $t1, 12($k0)
         sw         $t2, 16($k0)
         sw         $t3, 20($k0)
+		# sw 		   $t5, 24($k0)
+		# sw 		   $t7, 28($k0)
 
         mfc0       $k0, $13                     # Get Cause register
         srl        $a0, $k0, 2
@@ -919,12 +965,18 @@ bonk_interrupt:
 
 request_puzzle_interrupt:
     	sw	    $v0, REQUEST_PUZZLE_ACK 	    #acknowledge interrupt
-        li      $t5, 1
+        # la 		$t0, request_puzzle_ready
+		# li 		$t1, 1
+		# sw  	$t1, 0($t0)
+		li 		$t5, 1
     	j	    interrupt_dispatch	            # see if other interrupts are waiting
 
 timer_interrupt:
         sw      $v0, TIMER_ACK                  # acknowledge interrupt
-        li      $t7, 1                          # set the checker
+		# la 		$t0, timer_inter_ready
+		# li 		$t1, 1
+		# sw  	$t1, 0($t0)                      # set the checker
+		li 		$t7, 1
         j       interrupt_dispatch              # see if other interrupts are waiting
 
 non_intrpt:                                     # was some non-interrupt
@@ -941,6 +993,9 @@ done:
         lw      $t1, 12($k0)
         lw      $t2, 16($k0)
         lw      $t3, 20($k0)
+		# lw 		$t5, 24($k0)
+		# lw 	    $t7, 28($k0)
+
 .set noat
         move    $at, $k1                        # Restore $at
 .set at
